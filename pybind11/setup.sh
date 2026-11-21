@@ -24,5 +24,12 @@ mkdir build install
 cmake source -B build -G Ninja \
   -DCMAKE_INSTALL_PREFIX="$(realpath install)" \
   -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF
-cmake --build build --target check
+# pybind11 2.13.6's own pytest suite has a case that asserts on the exact
+# "unhashable type:" message prefix, which Python 3.14 changed. The suite is
+# irrelevant to consumers, so allow skipping it (used in CI).
+if [ "${YATCC_PYBIND11_SKIP_TESTS:-0}" = "1" ]; then
+  echo "skipping pybind11 self-tests (YATCC_PYBIND11_SKIP_TESTS=1)"
+else
+  cmake --build build --target check
+fi
 cmake --build build --target install

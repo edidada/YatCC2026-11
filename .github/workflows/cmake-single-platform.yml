@@ -49,7 +49,9 @@ jobs:
         # Release + 2 compile jobs (Debug + 32 jobs OOM-killed the runner).
         ./antlr/setup.sh
         YATCC_LLVM_BUILD_TYPE=Release YATCC_LLVM_JOBS=2 ./llvm/setup.sh
-        ./pybind11/setup.sh
+        # Skip pybind11's own pytest suite: one case asserts on a Python
+        # 3.14-changed error message and fails; we only need the library.
+        YATCC_PYBIND11_SKIP_TESTS=1 ./pybind11/setup.sh
 
         # Task5 needs two TableGen-generated RISCV .inc headers. Upstream keeps
         # them in a campus-only task5_setup.sh (hard-coded proxy + Tsinghua apt
