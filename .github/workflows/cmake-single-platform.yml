@@ -28,7 +28,7 @@ jobs:
           python3-pytest curl lld \
           llvm-18 llvm-18-dev clang-18 \
           flex bison unzip wget default-jdk ninja-build \
-          gcc-riscv64-linux-gnu g++-riscv64-linux-gnu qemu-user-static
+          gcc-riscv64-linux-gnu g++-riscv64-linux-gnu
 
         # LLVM 18 headers are incompatible with GCC 15 (-Wtemplate-body:
         # SmallVector has no member named begin/end). Pin GCC 14, fallback 13.
