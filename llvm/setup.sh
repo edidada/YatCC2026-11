@@ -42,9 +42,14 @@ mv clang-18*.src clang
 tar -xJvf cmake-18.src.tar.xz
 mv cmake-18*.src cmake
 
+# CI hosted runners have ~7 GB RAM; over-parallelising the LLVM+clang build
+# OOM-kills the runner. Allow the build type / job count to be overridden.
+_llvm_build_type="${YATCC_LLVM_BUILD_TYPE:-Debug}"
+_llvm_jobs="${YATCC_LLVM_JOBS:-32}"
+
 mkdir build install
 cmake llvm -B build -G Ninja \
-  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_BUILD_TYPE="$_llvm_build_type" \
   -DCMAKE_INSTALL_PREFIX=$(realpath install) \
   -DLLVM_ENABLE_PROJECTS="clang" \
   -DLLVM_TARGETS_TO_BUILD="$targets" \
@@ -54,5 +59,6 @@ cmake llvm -B build -G Ninja \
   -DLLVM_INCLUDE_BENCHMARKS=OFF \
   -DLLVM_INCLUDE_EXAMPLES=OFF \
   -DLLVM_INCLUDE_TESTS=OFF \
-  -DLLVM_PARALLEL_COMPILE_JOBS=32
-cmake --build build --target install -j 32
+  -DLLVM_PARALLEL_COMPILE_JOBS="$_llvm_jobs" \
+  -DLLVM_PARALLEL_LINK_JOBS=2
+cmake --build build --target install -j "$_llvm_jobs"

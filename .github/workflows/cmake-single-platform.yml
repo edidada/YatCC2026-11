@@ -45,8 +45,10 @@ jobs:
         # antlr.jar/antlr4 runtime + LLVM 18 (X86;RISCV) + pybind11.
         # The official setup.sh already passes -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         # so CMake 4.x can configure the bundled googletest.
+        # Keep the LLVM source build light enough for a 7 GB hosted runner:
+        # Release + 2 compile jobs (Debug + 32 jobs OOM-killed the runner).
         ./antlr/setup.sh
-        ./llvm/setup.sh
+        YATCC_LLVM_BUILD_TYPE=Release YATCC_LLVM_JOBS=2 ./llvm/setup.sh
         ./pybind11/setup.sh
 
         # Task5 needs two TableGen-generated RISCV .inc headers. Upstream keeps
