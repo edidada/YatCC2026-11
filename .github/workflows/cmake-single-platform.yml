@@ -1,0 +1,96 @@
+# CI for the official arcsysu/YatCC snapshot (YatCC2026-11).
+# Local build is intentionally skipped; GitHub Actions owns the build/score.
+name: CMake on a single platform
+
+on:
+  push:
+    branches: [ "main", "wsl" ]
+  pull_request:
+    branches: [ "main", "wsl" ]
+
+env:
+  BUILD_TYPE: Release
+  YatCC_LLVM_DIR: ${{ github.workspace }}/llvm
+  YatCC_ANTLR_DIR: ${{ github.workspace }}/antlr
+  YatCC_PYBIND11_DIR: ${{ github.workspace }}/pybind11
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: install deps
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          python3-pytest curl lld \
+          llvm-18 llvm-18-dev clang-18 \
+          flex bison unzip wget default-jdk ninja-build \
+          gcc-riscv64-linux-gnu g++-riscv64-linux-gnu qemu-user-static
+
+        # LLVM 18 headers are incompatible with GCC 15 (-Wtemplate-body:
+        # SmallVector has no member named begin/end). Pin GCC 14, fallback 13.
+        if sudo apt install -y gcc-14 g++-14; then
+          _cc=gcc-14; _cxx=g++-14
+        else
+          sudo apt install -y gcc-13 g++-13
+          _cc=gcc-13; _cxx=g++-13
+        fi
+        echo "CC=$_cc" >> $GITHUB_ENV
+        echo "CXX=$_cxx" >> $GITHUB_ENV
+        export CC=$_cc CXX=$_cxx
+
+        # antlr.jar/antlr4 runtime + LLVM 18 (X86;RISCV) + pybind11.
+        # The official setup.sh already passes -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        # so CMake 4.x can configure the bundled googletest.
+        ./antlr/setup.sh
+        ./llvm/setup.sh
+        ./pybind11/setup.sh
+
+        # Task5 needs two TableGen-generated RISCV .inc headers. Upstream keeps
+        # them in a campus-only task5_setup.sh (hard-coded proxy + Tsinghua apt
+        # mirror + root). Reproduce just the TableGen step here, no proxy.
+        mkdir -p "$YatCC_LLVM_DIR/task5/include"
+        LLVM_TBLGEN=/usr/lib/llvm-18/bin/llvm-tblgen
+        LLVM_SRC="$YatCC_LLVM_DIR/llvm"
+        INC="$YatCC_LLVM_DIR/task5/include"
+        "$LLVM_TBLGEN" -gen-register-info \
+          -I "$LLVM_SRC/include" -I "$YatCC_LLVM_DIR/install/include" \
+          -I "$LLVM_SRC/lib/Target" -I "$LLVM_SRC/lib/Target/RISCV" \
+          -o "$INC/RISCVGenRegisterInfo.inc" \
+          "$LLVM_SRC/lib/Target/RISCV/RISCV.td"
+        "$LLVM_TBLGEN" -gen-instr-info \
+          -I "$LLVM_SRC/include" -I "$YatCC_LLVM_DIR/install/include" \
+          -I "$LLVM_SRC/lib/Target" -I "$LLVM_SRC/lib/Target/RISCV" \
+          -o "$INC/RISCVGenInstrInfo.inc" \
+          "$LLVM_SRC/lib/Target/RISCV/RISCV.td"
+
+    - name: Configure CMake
+      # config.cmake reads YatCC_*_DIR from the environment (job env above).
+      run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+
+    - name: Build
+      run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }}
+
+    - name: score
+      # Scoring may fail on an unimplemented task; keep the job result tied to
+      # the Build step above, which is the real "compiles successfully" target.
+      continue-on-error: true
+      run: |
+        cd ${{ github.workspace }}/build
+        cmake --build . --target task0-score
+        cmake --build . --target task1-score
+        cmake --build . --target task2-score
+        cmake --build . --target task3-score
+        cmake --build . --target task4-score
+        cmake --build . --target task5-score
+
+    - name: git status
+      if: always()
+      run: |
+        echo "=== HEAD ==="
+        git log -1 --oneline
+        echo "=== git status ==="
+        git status --short --branch
