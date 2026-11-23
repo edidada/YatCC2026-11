@@ -1,0 +1,44 @@
+name: qemu probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: probe apt package
+      run: |
+        sudo apt-get update
+        echo "=== apt-cache policy ==="
+        apt-cache policy qemu-user-static qemu-user-binfmt || true
+        echo "=== try install ==="
+        if sudo apt-get install -y qemu-user-static; then
+          echo "APT_OK"
+        else
+          echo "APT_FAIL"
+        fi
+        echo "=== binaries ==="
+        ls -l /usr/bin/qemu-riscv64* 2>/dev/null || echo "NO_BIN_riscv64"
+
+    - name: probe docker binfmt fallback
+      run: |
+        echo "=== docker binfmt ==="
+        docker run --rm --privileged tonistiigi/binfmt --install riscv64 || echo "DOCKER_FAIL"
+        ls -l /usr/local/bin/qemu-riscv64* 2>/dev/null || echo "NO_LOCAL_BIN"
+
+    - name: run riscv binary under qemu
+      run: |
+        sudo apt-get install -y gcc-riscv64-linux-gnu
+        printf '#include <stdio.h>\nint main(){printf("hello riscv\\n");return 0;}\n' > /tmp/a.c
+        riscv64-linux-gnu-gcc -static -o /tmp/a.out /tmp/a.c || echo "CROSS_COMPILE_FAIL"
+        ls -l /tmp/a.out
+        if [ -x /usr/bin/qemu-riscv64-static ]; then
+          echo "=== run with /usr/bin/qemu-riscv64-static ==="
+          /usr/bin/qemu-riscv64-static /tmp/a.out || true
+        fi
+        Q=$(command -v qemu-riscv64-static || command -v qemu-riscv64 || true)
+        echo "QEMU found at: $Q"
+        [ -n "$Q" ] && "$Q" /tmp/a.out || true
