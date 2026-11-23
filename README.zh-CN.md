@@ -36,7 +36,7 @@ cmake --build build -j4
 ## CI 状态
 
 - GitHub Actions：`.github/workflows/cmake-single-platform.yml`，install deps → Configure → Build → score → git status。
-  - 已修复：`qemu-user-static` 无 apt candidate（已移除）、GCC 15 与 LLVM 18 头文件不兼容（固定 gcc-14）、runner OOM（Release + 2 jobs）。
+  - 已修复：`qemu-user-static` 无 apt candidate（改用 `qemu-user-binfmt` 并软链 `/usr/bin/qemu-riscv64-static`）、GCC 15 与 LLVM 18 头文件不兼容（固定 gcc-14）、runner OOM（Release + 2 jobs）。
   - 状态：见仓库 Actions 页（run `44905407253` 为重跑）。
 - Gitee 镜像：`https://gitee.com/edidada/YatCC2026-11`（`main` 分支，与 GitHub 同步）。
 - 本地：按实验要求**不编译**；构建全部交给 CI。

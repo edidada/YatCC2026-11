@@ -30,6 +30,18 @@ jobs:
           flex bison unzip wget default-jdk ninja-build \
           gcc-riscv64-linux-gnu g++-riscv64-linux-gnu
 
+        # task5 需要 qemu 运行 RV64 可执行文件。ubuntu-26.04 上 qemu-user-static
+        # 已变成 virtual package（没有 installation candidate），真实包是
+        # qemu-user-binfmt；它只装 /usr/bin/qemu-riscv64，而 test/task5 里写死
+        # 了 /usr/bin/qemu-riscv64-static，所以补一个软链。
+        if ! sudo apt-get install -y qemu-user-binfmt; then
+          sudo apt-get install -y qemu-user-static || true
+        fi
+        if [ ! -x /usr/bin/qemu-riscv64-static ]; then
+          sudo ln -sf /usr/bin/qemu-riscv64 /usr/bin/qemu-riscv64-static
+        fi
+        ls -l /usr/bin/qemu-riscv64* || echo "WARN: qemu-riscv64 not found"
+
         # LLVM 18 headers are incompatible with GCC 15 (-Wtemplate-body:
         # SmallVector has no member named begin/end). Pin GCC 14, fallback 13.
         if sudo apt install -y gcc-14 g++-14; then
