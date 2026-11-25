@@ -28,8 +28,10 @@ set(TASK5_REVIVE ON)
 # 以下内容为内部环境配置，一般情况下不需要学生修改，学生本地的修改对实验评测无影响。
 # ############################################################################ #
 
-# ANTLR4
-if(DEFINED ENV{YatCC_ANTLR_DIR})
+# ANTLR4：优先使用 cmake -DYatCC_ANTLR_DIR（CLion 生成选项），其次环境变量，最后默认目录
+if(DEFINED YatCC_ANTLR_DIR AND NOT YatCC_ANTLR_DIR STREQUAL "")
+  set(_antlr_dir "${YatCC_ANTLR_DIR}")
+elseif(DEFINED ENV{YatCC_ANTLR_DIR})
   set(_antlr_dir "$ENV{YatCC_ANTLR_DIR}")
 else()
   set(_antlr_dir "${CMAKE_SOURCE_DIR}/antlr")
@@ -39,8 +41,10 @@ set(antlr4-runtime_DIR "${_antlr_dir}/install/lib/cmake/antlr4-runtime")
 set(antlr4-generator_DIR "${_antlr_dir}/install/lib/cmake/antlr4-generator")
 set(ANTLR4_JAR_LOCATION "${_antlr_dir}/antlr.jar")
 
-# LLVM 和 Clang
-if(DEFINED ENV{YatCC_LLVM_DIR})
+# LLVM 和 Clang：优先使用 cmake -DYatCC_LLVM_DIR（CLion 生成选项），其次环境变量，最后默认目录
+if(DEFINED YatCC_LLVM_DIR AND NOT YatCC_LLVM_DIR STREQUAL "")
+  set(_llvm_dir "${YatCC_LLVM_DIR}")
+elseif(DEFINED ENV{YatCC_LLVM_DIR})
   set(_llvm_dir "$ENV{YatCC_LLVM_DIR}")
 else()
   set(_llvm_dir "${CMAKE_SOURCE_DIR}/llvm")
@@ -54,8 +58,10 @@ set(LLVM_INSTALL_DIR "${_llvm_dir}/install")
 set(CLANG_EXECUTABLE "${_llvm_dir}/install/bin/clang")
 set(CLANG_PLUS_EXECUTABLE "${_llvm_dir}/install/bin/clang++")
 
-# PYBIND11
-if(DEFINED ENV{YatCC_PYBIND11_DIR})
+# PYBIND11：优先使用 cmake -DYatCC_PYBIND11_DIR（CLion 生成选项），其次环境变量，最后默认目录
+if(DEFINED YatCC_PYBIND11_DIR AND NOT YatCC_PYBIND11_DIR STREQUAL "")
+  set(_pybind11_dir "${YatCC_PYBIND11_DIR}")
+elseif(DEFINED ENV{YatCC_PYBIND11_DIR})
   set(_pybind11_dir "$ENV{YatCC_PYBIND11_DIR}")
 else()
   set(_pybind11_dir "${CMAKE_SOURCE_DIR}/pybind11")
