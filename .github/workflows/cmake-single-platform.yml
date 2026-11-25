@@ -90,6 +90,30 @@ jobs:
     - name: Build
       run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }}
 
+    - name: Run task5
+      # task5 takes <input.ll> <output.s>. The score target also drives it via
+      # ctest, but that step is continue-on-error, so exercise the built binary
+      # directly here and fail the job if it cannot lower IR to assembly.
+      run: |
+        set -euo pipefail
+        WORK="${{ runner.temp }}/task5-smoke"
+        mkdir -p "$WORK"
+        # task5 is a student skeleton: calls/loads/stores still hit
+        # "TODO: Student Implementation", so keep the smoke IR to a plain ret.
+        cat > "$WORK/input.c" <<'EOF'
+        int main(void) { return 0; }
+        EOF
+        /usr/bin/clang-18 --target=riscv64-unknown-linux-gnu \
+          -march=rv64gc -mabi=lp64d -O2 -S -emit-llvm \
+          -o "$WORK/input.ll" "$WORK/input.c"
+        echo "=== input.ll ==="
+        sed -n '1,40p' "$WORK/input.ll"
+        ${{ github.workspace }}/build/task/5/task5 "$WORK/input.ll" "$WORK/output.s"
+        echo "=== output.s ==="
+        sed -n '1,60p' "$WORK/output.s"
+        test -s "$WORK/output.s"
+        echo "task5 OK: generated $WORK/output.s"
+
     - name: score
       # Scoring may fail on an unimplemented task; keep the job result tied to
       # the Build step above, which is the real "compiles successfully" target.
