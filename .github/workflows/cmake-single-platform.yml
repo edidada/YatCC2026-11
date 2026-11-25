@@ -93,26 +93,55 @@ jobs:
     - name: Run task5
       # task5 takes <input.ll> <output.s>. The score target also drives it via
       # ctest, but that step is continue-on-error, so exercise the built binary
-      # directly here and fail the job if it cannot lower IR to assembly.
+      # directly here and fail the job if any case cannot lower IR to assembly.
+      # Cases are hand-written IR covering the paths implemented in the skeleton
+      # (ret / 64-bit ret / multiple functions / unconditional br / switch /
+      # select / alloca+casts / phi). Unimplemented paths (binary ops, icmp,
+      # load/store, call) are intentionally excluded so the job stays green.
       run: |
         set -euo pipefail
-        WORK="${{ runner.temp }}/task5-smoke"
-        mkdir -p "$WORK"
-        # task5 is a student skeleton: calls/loads/stores still hit
-        # "TODO: Student Implementation", so keep the smoke IR to a plain ret.
-        cat > "$WORK/input.c" <<'EOF'
-        int main(void) { return 0; }
-        EOF
-        /usr/bin/clang-18 --target=riscv64-unknown-linux-gnu \
-          -march=rv64gc -mabi=lp64d -O2 -S -emit-llvm \
-          -o "$WORK/input.ll" "$WORK/input.c"
-        echo "=== input.ll ==="
-        sed -n '1,40p' "$WORK/input.ll"
-        ${{ github.workspace }}/build/task/5/task5 "$WORK/input.ll" "$WORK/output.s"
-        echo "=== output.s ==="
-        sed -n '1,60p' "$WORK/output.s"
-        test -s "$WORK/output.s"
-        echo "task5 OK: generated $WORK/output.s"
+        TASK5=${{ github.workspace }}/build/task/5/task5
+        W="${{ runner.temp }}/task5-smoke"
+        mkdir -p "$W"
+
+        write_case() { name=$1; shift; printf '%s\n' "$@" > "$W/$name.ll"; }
+        run_case() {
+          if ! "$TASK5" "$W/$1.ll" "$W/$1.s" > "$W/$1.log" 2>&1; then
+            echo "FAIL $1"; cat "$W/$1.log"; exit 1
+          fi
+          test -s "$W/$1.s"
+          echo "PASS $1 ($(wc -c < "$W/$1.s") bytes)"
+        }
+
+        write_case ret_const \
+          'define i32 @main() {' '  ret i32 42' '}'
+        write_case ret_neg64 \
+          'define i64 @main() {' '  ret i64 -9223372036854775808' '}'
+        write_case multi_fn \
+          'define i32 @foo() {' '  ret i32 7' '}' \
+          'define i32 @main() {' '  ret i32 3' '}'
+        write_case br_uncond \
+          'define i32 @main() {' 'entry:' '  br label %next' 'next:' '  ret i32 9' '}'
+        write_case switch_const \
+          'define i32 @main() {' 'entry:' \
+          '  switch i32 2, label %def [ i32 1, label %one i32 2, label %two ]' \
+          'one:' '  ret i32 10' 'two:' '  ret i32 20' 'def:' '  ret i32 0' '}'
+        write_case select_const \
+          'define i32 @main() {' 'entry:' \
+          '  %r = select i1 true, i32 11, i32 22' '  ret i32 %r' '}'
+        write_case alloca_cast \
+          'define i32 @main() {' 'entry:' '  %p = alloca i32, align 4' \
+          '  %v = ptrtoint ptr %p to i64' '  %t = trunc i64 %v to i32' \
+          '  ret i32 %t' '}'
+        write_case phi_br \
+          'define i32 @main() {' 'entry:' '  br label %body' 'body:' \
+          '  %p = phi i32 [ 5, %entry ]' '  ret i32 %p' '}'
+
+        for c in ret_const ret_neg64 multi_fn br_uncond switch_const \
+                 select_const alloca_cast phi_br; do
+          run_case "$c"
+        done
+        echo "task5 smoke: 8/8 cases OK"
 
     - name: score
       # Scoring may fail on an unimplemented task; keep the job result tied to
